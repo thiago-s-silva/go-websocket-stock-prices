@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"github.com/joho/godotenv"
 	"github.com/thiago-s-silva/go-websocket-stock-prices/internals"
-	"github.com/thiago-s-silva/go-websocket-stock-prices/pkg"
+	"github.com/thiago-s-silva/go-websocket-stock-prices/pkg/Coinbase"
 	"log"
 	"os"
 	"os/signal"
@@ -24,7 +24,7 @@ func main() {
 	}
 
 	// Init a new coinbase service instance
-	coinbaseService := pkg.NewCoinbase(cryptoEndpoint)
+	coinbaseService := Coinbase.NewCoinbase(cryptoEndpoint)
 
 	// Init the server instance
 	server := internals.NewServer(coinbaseService)
@@ -48,5 +48,5 @@ func main() {
 	fmt.Println("Stopping the server...")
 
 	// Stop the server
-	defer server.Stop()
+	server.Stop()
 }

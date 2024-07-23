@@ -2,8 +2,10 @@ package internals
 
 import (
 	"fmt"
-	"github.com/thiago-s-silva/go-websocket-stock-prices/pkg"
+	"github.com/thiago-s-silva/go-websocket-stock-prices/pkg/Coinbase"
 	"log"
+	"os"
+	"strconv"
 )
 
 type Server interface {
@@ -12,11 +14,22 @@ type Server interface {
 }
 
 type server struct {
-	coinbaseService pkg.Coinbase
+	coinbaseService Coinbase.Coinbase
+	cryptoChannel   chan []byte
+	numberOfWorkers int
 }
 
-func NewServer(coinbaseService pkg.Coinbase) *server {
-	return &server{coinbaseService: coinbaseService}
+func NewServer(coinbaseService Coinbase.Coinbase) *server {
+	numberOfWorkers, err := strconv.Atoi(os.Getenv("NUMBER_OF_WORKERS"))
+	if err != nil {
+		numberOfWorkers = 1
+	}
+
+	return &server{
+		coinbaseService: coinbaseService,
+		cryptoChannel:   make(chan []byte, numberOfWorkers),
+		numberOfWorkers: numberOfWorkers,
+	}
 }
 
 func (s *server) Run() error {
@@ -34,13 +47,18 @@ func (s *server) Run() error {
 	}
 	fmt.Println("Subscribed to ETH-USD channel")
 
+	// Init the workers to start processing the received crypto messages
+	s.initWorkers()
+
 	// Start listening for the messages
 	for {
 		message, err := s.coinbaseService.Listen()
 		if err != nil {
 			return err
 		}
-		fmt.Println(string(message))
+
+		// Send the received message to the crypto channel
+		s.cryptoChannel <- message
 	}
 }
 
@@ -53,5 +71,16 @@ func (s *server) Stop() {
 		log.Fatal(err)
 	}
 
+	// Close the crypto channel
+	close(s.cryptoChannel)
+
 	fmt.Println("Server stopped")
+}
+
+func (s *server) initWorkers() {
+	for i := 0; i < s.numberOfWorkers; i++ {
+		go processCrypto(i, s.cryptoChannel)
+	}
+
+	fmt.Println("Workers initialized")
 }
